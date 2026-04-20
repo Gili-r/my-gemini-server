@@ -14,13 +14,13 @@ module.exports = async function handler(req, res) {
 	// רשימת מודלים חסכונית ויציבה (Flash בלבד)
     const configurations = [
         // עדיפות 1: המודל המאוזן והמהיר ביותר
-        { name: "gemini-2.0-flash", version: "v1" }, 
+        { name: "gemini-2.0-flash", version: "v1beta" }, 
         
         // עדיפות 2: מודל חדיש כגיבוי
-        { name: "gemini-2.5-flash", version: "v1" }, 
+        { name: "gemini-2.5-flash", version: "v1beta" }, 
         
         // עדיפות 3: גרסת ה-Lite (חסכונית במיוחד) כרשת ביטחון אחרונה
-        { name: "gemini-2.5-flash-lite", version: "v1" }
+        { name: "gemini-2.5-flash-lite", version: "v1beta" }
     ];
 
     let lastError = null;
