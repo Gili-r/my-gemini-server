@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>החממה למדעי המחשב (Java)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        
+        /* Resizer Styles */
+        .resizer {
+            width: 8px;
+            background-color: #e5e7eb;
+            cursor: col-resize;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.2s;
+            z-index: 10;
+        }
+        .resizer:hover, .resizer.active {
+            background-color: #3b82f6;
+        }
+        .resizer::after {
+            content: "⋮";
+            color: #9ca3af;
+            font-size: 20px;
+        }
+        .resizer:hover::after, .resizer.active::after {
+            color: white;
+        }
+
+        body.is-resizing iframe {
+            pointer-events: none;
+        }
+
+        /* Markdown Styles for Chat */
+        .markdown-body table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 1rem;
+        }
+        .markdown-body th, .markdown-body td {
+            border: 1px solid #d1d5db;
+            padding: 0.5rem;
+            text-align: right;
+        }
+        .markdown-body th {
+            background-color: #f3f4f6;
+        }
+        .markdown-body pre {
+            background-color: #1f2937;
+            color: #e5e7eb;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            overflow-x: auto;
+            direction: ltr;
+            margin-bottom: 0.5rem;
+        }
+        .markdown-body code {
+            font-family: monospace;
+            background-color: #f3f4f6;
+            padding: 0.1rem 0.3rem;
+            border-radius: 0.25rem;
+            color: #ef4444;
+            direction: ltr;
+            display: inline-block;
+        }
+        .markdown-body pre code {
+            background-color: transparent;
+            color: inherit;
+            padding: 0;
+        }
+        .markdown-body p {
+            margin-bottom: 0.5rem;
+        }
+
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #10b981;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen w-screen flex flex-row">
+
+	<div id="welcome-modal" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center backdrop-blur-sm">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl w-[400px] max-w-[90%] border-t-8 border-emerald-500 transition-colors" id="modal-card">
+            <h2 class="text-3xl font-bold mb-2 text-gray-800 text-center">ברוכים הבאים! 👋</h2>
+            <p class="text-gray-600 text-center mb-6 text-sm">הכנסו פרטים כדי להתחיל את הלמידה</p>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-bold text-gray-700 mb-2">איך קוראים לך?</label>
+                <input type="text" id="student-name" placeholder="השם שלך..." class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors bg-gray-50">
+            </div>
+
+            <div class="mb-8">
+                <label class="block text-sm font-bold text-gray-700 mb-2">באיזו כיתה אתה לומד?</label>
+                <select id="student-grade" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors bg-gray-50">
+                    <option value="" disabled selected>בחר שכבה...</option>
+                    <option value="10">כיתה י' (ירוק)</option>
+                    <option value="11">כתה י"א (כחול)</option>
+                    <option value="12">כיתה י"ב (סגול)</option>
+                </select>
+            </div>
+
+            <button onclick="startGame()" id="start-btn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-lg transition-colors text-lg shadow-md">
+                התחל ללמוד 🚀
+            </button>
+        </div>
+    </div>
+
+    <div id="panel1" class="flex flex-col bg-white h-full" style="width: 33.33%;">
+        <div class="p-3 border-b border-gray-200 bg-emerald-600 text-white transition-colors">
+            <h2 class="font-bold mb-2 flex items-center gap-2">
+				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ml-2">
+					<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+					<polyline points="14 2 14 8 20 8"></polyline>
+					<line x1="16" y1="13" x2="8" y2="13"></line>
+					<line x1="16" y1="17" x2="8" y2="17"></line>
+					<polyline points="10 9 9 9 8 9"></polyline>
+				</svg>
+                מסמך דרייב (משימה/חומר עזר)
+            </h2>
+            <div class="flex flex-col gap-2">
+                <div class="flex gap-2">
+                    <input type="text" id="drive-url" placeholder="הדבק כאן קישור לגוגל דרייב..." class="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:border-emerald-500 text-gray-900" dir="ltr">
+					<button onclick="loadDrive()" class="bg-white text-emerald-700 font-bold px-5 py-2 rounded-lg shadow-md hover:shadow-lg hover:bg-gray-50 transition-all duration-200 active:scale-95 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-emerald-600 flex items-center justify-center gap-2">
+						טען
+					</button>
+                </div>
+                <a id="open-drive-link" href="#" target="_blank" class="text-xs text-emerald-600 hover:underline hidden text-center cursor-pointer">
+                    🔗 פתח מסמך בטאב נפרד
+                </a>
+            </div>
+        </div>
+        <div class="flex-1 relative bg-gray-50 flex items-center justify-center overflow-hidden">
+			<span id="drive-placeholder" class="text-gray-400 text-sm text-center px-4">
+				העתק את קישור המשימה מהקלאסרום, הדבק אותו למעלה ולחץ "טען".<br>
+				<span class="text-xs text-blue-500 font-bold">(שים לב: עליך להיות מחובר בדפדפן לחשבון משרד החינוך שלך)</span>
+			</span>
+            <iframe id="drive-iframe" class="w-full h-full absolute inset-0 hidden border-0" src=""></iframe>
+        </div>
+    </div>
+
+    <div id="resizer1" class="resizer"></div>
+
+    <div id="panel2" class="flex flex-col h-full bg-white border-x border-gray-200" style="width: 33.33%;">
+        <div class="p-3 border-b border-gray-200 bg-emerald-600 text-white transition-colors">
+            <h2 class="font-bold flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
+					<path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path>
+					<line x1="6" y1="1" x2="6" y2="4"></line>
+					<line x1="10" y1="1" x2="10" y2="4"></line>
+					<line x1="14" y1="1" x2="14" y2="4"></line>
+				</svg>
+                סביבת פיתוח (Java)
+            </h2>
+        </div>
+        <div class="flex-1 relative">
+            <iframe id="compiler-iframe" src="https://onecompiler.com/embed/java" class="w-full h-full absolute inset-0 border-0"></iframe>
+        </div>
+    </div>
+
+    <div id="resizer2" class="resizer"></div>
+
+    <div id="panel3" class="flex flex-col bg-white h-full" style="width: 33.33%;">
+        <div class="p-3 border-b border-gray-200 bg-emerald-600 text-white flex justify-between items-start transition-colors">
+            <div class="flex-1">
+                <h2 class="font-bold flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<path d="M20 12v-2a8 8 0 0 0-16 0v2c0 4 3 8 8 8s8-4 8-8z"></path>
+						<path d="M4 10l4-6"></path>
+						<path d="M20 10l-4-6"></path>
+						<circle cx="9" cy="11" r="2"></circle>
+						<circle cx="15" cy="11" r="2"></circle>
+						<path d="M12 14l-1 2h2z"></path>
+					</svg>
+                    מורה חכם (Java)
+                </h2>
+                <div class="mt-2 flex items-center gap-2">
+                    <label for="tutor-select" class="text-xs font-semibold text-white">בחר מורה:</label>
+                    <select id="tutor-select" onchange="changeTutor()" class="text-xs p-1 border border-emerald-300 rounded bg-white text-emerald-800 focus:outline-none focus:border-emerald-500 w-full max-w-[200px]">
+                        <option value="socrates">סוקרטס (כללי ורקורסיה)</option>
+                        <option value="expert">מומחה מבני נתונים</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4 bg-white"></div>
+		
+		<div class="border-t border-gray-200 bg-gray-50 py-2 px-4 flex justify-end">
+			<button id="summary-btn" onclick="requestSummary()" class="bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold px-4 py-1.5 rounded-md shadow-sm hover:bg-emerald-200 transition-all duration-200 active:scale-95 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm flex items-center gap-2">
+				<span>🎓</span> סיכום הלמידה למורה
+			</button>
+		</div>
+
+        <div class="p-3 border-t border-gray-200 bg-gray-50 flex flex-col gap-2 shrink-0">
+            <div class="flex gap-2">
+                <textarea id="chat-input" rows="2" placeholder="הקלד כאן את תשובתך..." class="flex-1 p-2 border border-gray-300 rounded resize-none focus:outline-none focus:border-emerald-500 text-sm"></textarea>
+                <div class="flex flex-col gap-2 w-20">
+					<button onclick="handleSend()" id="send-btn" class="bg-emerald-600 text-white font-bold px-5 py-2 rounded-lg shadow-md hover:shadow-lg hover:bg-emerald-700 transition-all duration-200 active:scale-95 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 flex items-center justify-center gap-2">
+						שלח
+					</button>
+                </div>
+            </div>
+            <div id="loading-indicator" class="hidden text-center text-emerald-600 text-sm py-1">
+                <span class="loader align-middle ml-2"></span> המורה חושב...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const PROXY_URL = '/api/gemini';
+
+		// ==========================================
+        // מאגר הפרומפטים למורים השונים
+        // ==========================================
+        const prompts = {
+			grade10_tutor: `
+הגדרת תפקיד:
+אתה "סוקרטס-Java", חונך אישי לתלמידי כיתה י' שעושים את צעדיהם הראשונים בתכנות בשפת Java (יסודות: משתנים, תנאים if-else, לולאות for/while). 
+תפקידך להוביל את התלמיד לפתרון בעצמו באמצעות שאלות מנחות פשוטות, ללא מתן קוד מוכן וללא הסברים ארוכים מדי. התלמידים הם מתחילים, לכן הסבר שגיאות קומפילציה (כמו חוסר פסיק נקודה, סוגריים שלא נסגרו, או Cannot find symbol) בסבלנות ובגובה העיניים.
+
+חוקי ברזל (קריטי לביצוע!):
+* כלל "שאלה אחת": בכל תגובה שלך, שאל שאלה אחת בלבד ממוקדת שתגרום לתלמיד לחשוב.
+* קיצור מרבי: שמור על תגובות קצרות וידידותיות. עומס טקסט ירתיע תלמיד מתחיל.
+* שפה: ענה בעברית ברורה. הסבר מושגים באנגלית (כמו syntax error, variable, loop) בצורה פשוטה במידת הצורך.
+* איסור קוד מלא: לעולם אל תכתוב פתרון מלא או פונקציה שלמה. מותר לכתוב רק תבנית בסיסית (למשל איך נראית לולאת for באופן כללי) אם התלמיד ממש תקוע ולא מבין את התחביר.
+* בלי הצבעה ישירה על שגיאות מיד: אם חסר פסיק נקודה, שאל למשל "האם שמת לב מה חסר בסוף שורה 10 כדי שהשורה תסתיים כראוי?" במקום לומר מיד "חסר לך ;". 
+* חכה למענה: לאחר ששאלת שאלה, חכה בסבלנות.
+`,
+			grade10_test_tutor: `
+הגדרת תפקיד:
+אתה "Smart-Test" - בוחן וחונך סוקרטי אישי ותהליכי לתלמידי כיתה י' במדעי המחשב.
+קהל היעד: תלמידים בתחילת דרכם בשפת Java.
+טווח הידע המותר: משתנים (int, double, boolean, String), תנאים (if-else) ולולאות (for, while). 
+חל איסור להשתמש בנושאים מתקדמים (מערכים, פונקציות או עצמים), אלא אם התלמיד השתמש בהם בעצמו.
+
+מבנה המבחן:
+שלב א' (חובה): לווה את התלמיד בפתרון שאלת הבסיס שהמורה נתנה. פעל בגישה סוקרטית: שאל שאלה מנחה אחת בכל פעם, עזור לו לדבג, ואל תיתן קוד מלא לעולם.
+שלב ב' (אדפטיבי/בונוס): ברגע שהתלמיד פתר את שאלת החובה, שבח אותו ושנה פאזה. 
+המצא וכתוב לו 2 תרחישים (שאלות) חדשים לגמרי ומנותקים מהשאלה הקודמת. השאלות צריכות להיות ברמת קושי גבוהה יותר (לוגיקה מורכבת יותר בתוך טווח הידע המותר).
+
+חוקי הברזל:
+1. שאלות ההמשך (שלב ב') חייבות להיות נושאים חדשים: למשל, אם שאלת הבסיס הייתה על חישוב ממוצע ציונים (לולאה), שאלות ההמשך יכולות להיות על "בניית סימולטור לכספומט" או "מערכת בדיקת תקינות סיסמה" (שילוב של תנאים ולולאות בצורה מורכבת).
+2. רמת קושי: שאלות ההמשך צריכות לאתגר את החשיבה הלוגית (למשל: לולאות מקננות, תנאים מרובים, או שימוש במונה/סופר בתוך תנאי).
+3. לאחר הצגת 2 השאלות החדשות, חזור לגישה הסוקרטית ולווה את התלמיד בפתרון המשימה שבחר.
+4. איסור מטא-דיבור: אל תציין שאתה פועל בשיטה הסוקרטית, אל תגיד "אני שואל רק שאלה אחת" ואל תפרט את חוקי הפרומפט.
+5. תמציתיות: תגובות קצרות וממוקדות תוכן בלבד.
+`,
+            grade10_expert: `
+הנחיית המערכת (System Instructions):
+אתה מורה ליסודות מדעי המחשב ב-Java. אתה עוזר לתלמידי כיתה י' להבין אלגוריתמים בסיסיים (כמו מציאת מקסימום/מינימום במערך, ספירה, צבירה/סכום, ושימוש נכון בתנאים ולולאות).
+חוקי הברזל שלך:
+איסור מתן פתרון: אל תכתוב קוד מוכן לעולם.
+תמציתיות: הסברים קצרים, ברורים ומדויקים.
+הכוונה לוגית: עזור לתלמיד לחשוב על סדר הפעולות (אלגוריתם) לפני שהוא ניגש לכתוב את הקוד, או הצע לו לבצע "טבלת מעקב" פשוטה על נייר כדי להבין למה הלולאה שלו לא עובדת כמו שצריך.
+שאלת שאלות: סיים תמיד בשאלה שמקדמת את התלמיד צעד אחד קדימה.
+`,
+            socrates: `
+הגדרת תפקיד:
+אתה "סוקרטס-יסודות", חונך אישי לתלמידי תיכון הלומדים למבחן הבגרות במדעי המחשב ב-Java או C#. 
+התלמידים למדו: משתנים, תנאים, לולאות, מערכים ויסודות תכנות מונחה עצמים.
+תפקידך להוביל את התלמיד לפתרון בעצמו באמצעות שאלות מנחות, ללא מתן קוד מוכן.
+
+חוקי ברזל:
+* שאל שאלה אחת בלבד ממוקדת שתגרום לתלמיד לחשוב.
+* שמור על תגובות קצרות וידידותיות.
+* ענה בעברית ברורה וידידותית. עזור להם להבין הודעות שגיאה בפשטות.
+* איסור קוד מלא: לעולם אל תכתוב פתרון מלא או פעולה שלמה (מותר מבנה בסיסי בלבד).
+* חכה למענה: לאחר ששאלת שאלה, חכה בסבלנות שהתלמיד יענה.`,
+            
+            oop_expert: `
+הנחיית המערכת (System Instructions):
+אתה "מומחה תכנות מונחה עצמים (OOP)", מורה שעוזר לתלמידים לבנות נכון מחלקות ואובייקטים לקראת בגרות 899371.
+אתה עוזר להם לחשוב על תכונות (Attributes), פעולות (Methods), פעולה בונה והכמסה (Encapsulation).
+
+חוקי הברזל שלך:
+1. איסור מתן פתרון: אל תכתוב את המחלקה עבורם.
+2. תמציתיות והכוונה: הסברים קצרים שמכוונים לתכנון נכון.
+3. שאלות מנחות: שאל למשל "אילו תכונות מתארות מכונית?", "מה הפעולה הבונה מקבלת?".
+4. סיים תמיד בשאלה שמקדמת את התלמיד צעד אחד קדימה.`,
+
+            grade12_tutor: `
+הגדרת תפקיד:
+אתה "סוקרטס-Java", חונך אישי לתלמידי תיכון הניגשים לבגרות במדעי המחשב ב-Java. התמחותך היא במבני נתונים (רשימה מקושרת, תור, עץ בינארי) ורקורסיה. תפקידך להוביל את התלמיד לפתרון בעצמו באמצעות שאלות מנחות, ללא מתן קוד מוכן וללא הסברים ארוכים.
+
+חוקי ברזל (קריטי לביצוע!):
+* כלל "שאלה אחת": בכל תגובה שלך, שאל שאלה אחת בלבד. בשום אופן אל תציף ברשימת שאלות.
+* קיצור מרבי: שמור על תגובות קצרות, תמציתיות ו"רזות". ללא הקדמות ארוכות. תן לתלמיד לעשות את העבודה.
+* שפה: ענה בעברית ברורה. השתמש במושגים מקצועיים באנגלית כפי שהם מופיעים בחומר הבגרות (למשל: Node, BinNode, Queue, Base Case).
+* איסור קוד מלא: לעולם אל תכתוב פונקציות שלמות עבור התלמיד. מותר לכתוב רק שורת קוד אחת כדוגמה כללית (Syntax) ורק על בעיה תיאורטית אחרת.
+* בלי הצבעה ישירה על שגיאות: אם התלמיד טועה, אל תצביע על השורה הבעייתית. שאל שאלת "מה יקרה אם..." כדי שימצא את הבעיה לבד.
+* המחשה ויזואלית (חשוב!): השתמש ככל האפשר בהמחשות טקסטואליות (ASCII art).
+* חכה למענה: לאחר ששאלת שאלה, חכה בסבלנות לתשובה.
+`
+        };
+
+        // ==========================================
+        // שיוך מורים לשכבות לימוד
+        // ==========================================
+        const tutorsDatabase = {
+            '10': [
+                { id: 'grade10_tutor', name: 'סוקרטס - יסודות התכנות' },
+				{ id: 'grade10_test_tutor', name: 'Smart-Test: ליווי אישי ותהליכי' }
+            ],
+            '11': [
+                { id: 'socrates', name: 'סוקרטס - יסודות התכנות' },
+                { id: 'oop_expert', name: 'מומחה תכנות מונחה עצמים (OOP)' }
+            ],
+            '12': [
+                { id: 'grade12_tutor', name: 'מורה למבני נתונים (י"ב)' }
+            ]
+        };
+
+        let chatHistory = [];
+        let activeTutor = 'socrates';
+        const chatContainer = document.getElementById('chat-messages');
+        const chatInput = document.getElementById('chat-input');
+        const loadingIndicator = document.getElementById('loading-indicator');
+		
+		// משתנים גלובליים חדשים לשמירת נתוני התלמיד
+        let studentName = '';
+        let studentGrade = '';
+        let currentColor = 'emerald'; // הצבע ההתחלתי (של י"א)
+
+        function startGame() {
+            const nameInput = document.getElementById('student-name').value.trim();
+            const gradeSelect = document.getElementById('student-grade').value;
+
+            if (!nameInput || !gradeSelect) {
+                alert("אנא הכנס שם ובחר כיתה כדי להתחיל.");
+                return;
+            }
+
+            studentName = nameInput;
+            studentGrade = gradeSelect;
+
+            // בחירת צבע לפי כיתה (י = כחול, יא = ירוק, יב = סגול)
+            let newColor = 'emerald';
+            if (studentGrade === '11') newColor = 'blue';
+            if (studentGrade === '12') newColor = 'purple';
+
+            // החלפת צבעי האפליקציה
+            changeAppColor(newColor);
+
+            // הסתרת מודל הפתיחה
+            document.getElementById('welcome-modal').classList.add('opacity-0', 'pointer-events-none');
+            setTimeout(() => document.getElementById('welcome-modal').classList.add('hidden'), 300);
+
+            // שליחת הודעת פתיחה אישית מהמורה
+            appendMessage('model', `היי ${studentName}! איזה כיף שהצטרפת. אני סוקרטס, החונך האישי שלך. על איזו בעיה נרצה לעבוד היום?`);
+			
+			// מילוי תפריט המורים לפי השכבה שנבחרה
+            populateTutorSelector(studentGrade);
+        }
+
+        function changeAppColor(newColor) {
+            if (currentColor === newColor) return;
+            
+            // פונקציית הקסם: מוצאת כל אלמנט שצבוע בצבע הישן, ומחליפה לחדש
+            document.querySelectorAll(`[class*="${currentColor}-"]`).forEach(el => {
+                el.className = el.className.split(' ').map(cls => cls.includes(currentColor) ? cls.replace(currentColor, newColor) : cls).join(' ');
+            });
+            
+            currentColor = newColor;
+        }
+		
+		// פונקציה שממלאת את תפריט המורים בהתאם לכיתה שנבחרה
+        function populateTutorSelector(grade) {
+            const selector = document.getElementById('tutor-select');
+            selector.innerHTML = ''; // מחיקת האופציות הישנות
+            
+            // הוספת המורים המתאימים לשכבה
+            if (tutorsDatabase[grade]) {
+                tutorsDatabase[grade].forEach(tutor => {
+                    const option = document.createElement('option');
+                    option.value = tutor.id; // שומר את המזהה (כמו 'oop_expert')
+                    option.textContent = tutor.name; // מציג את השם הידידותי
+                    selector.appendChild(option);
+                });
+            }
+        }
+		
+		// פונקציה שמופעלת כשהתלמיד מחליף מורה מהתפריט
+        function changeTutor() {
+            // ניקוי היסטוריית השיחה הקודמת
+            chatHistory = [];
+            document.getElementById('chat-messages').innerHTML = '';
+            
+            // שליפת שם המורה החדש והצגת הודעת פתיחה
+            const tutorSelect = document.getElementById('tutor-select');
+            const tutorName = tutorSelect.options[tutorSelect.selectedIndex].text;
+            
+            appendMessage('model', `שלום! עברת עכשיו ללמוד איתי (${tutorName}). איך אפשר לעזור לך?`);
+        }
+
+
+        function loadDrive() {
+            const url = document.getElementById('drive-url').value.trim();
+            if (!url) return;
+            const iframe = document.getElementById('drive-iframe');
+            iframe.src = url.replace(/\/view.*$/, '/preview').replace(/\/edit.*$/, '/preview');
+            iframe.classList.remove('hidden');
+            document.getElementById('drive-placeholder').classList.add('hidden');
+        }
+		
+		// ==========================================
+        // פונקציות תצוגה ותקשורת מבוססות Streaming
+        // ==========================================
+
+        // פונקציה חדשה: יוצרת בועת צ'אט "ריקה" שאותה נמלא בזמן אמת
+        function createMessageBubble(role) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = role === 'user' ? 'flex justify-end' : 'flex justify-start';
+            const userBgClass = `bg-${currentColor}-100`; 
+            
+            const innerDiv = document.createElement('div');
+            innerDiv.className = `p-3 rounded-xl shadow-sm text-sm ${role === 'user' ? userBgClass : 'bg-gray-100 markdown-body'}`;
+            msgDiv.appendChild(innerDiv);
+            
+            chatContainer.appendChild(msgDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return innerDiv; // מחזירים את האלמנט הפנימי כדי להזריק לתוכו טקסט בהמשך
+        }
+
+        // פונקציה קיימת מעודכנת (משמשת בעיקר להודעות של התלמיד או הודעות שגיאה רגילות)
+        function appendMessage(role, text) {
+            const bubble = createMessageBubble(role);
+            bubble.innerHTML = role === 'user' ? text : marked.parse(text);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // מחליף את fetchGeminiResponse: קורא את הזרם מגוגל ומפענח אותו חי
+        async function fetchGeminiStream(contents, systemInstructionText, onUpdate) {
+            const payload = {
+                contents: contents,
+                systemInstruction: { parts: [{ text: systemInstructionText }] }
+            };
+
+            const response = await fetch(PROXY_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.status === 429) throw new Error("המורה עמוס כרגע... אנא המתן כ-30 שניות ונסה שוב.");
+            if (response.status === 503) throw new Error("השרתים של גוגל בעומס עולמי. אל דאגה, נסה שוב בעוד דקה.");
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.error?.message || `שגיאה בתקשורת (${response.status})`);
+            }
+
+            // מכינים כלים לקריאת הסטרים
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            let fullText = '';
+            let buffer = '';
+
+            // לולאה שרצה כל עוד השרת ממשיך לשלוח נתונים
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                // מפענחים את החתיכה שהגיעה
+                buffer += decoder.decode(value, { stream: true });
+                
+                // הנתונים מגיעים בשורות. נפריד אותם (ונשמור שורה חלקית בבאפר אם יש)
+                const lines = buffer.split('\n');
+                buffer = lines.pop(); 
+
+                for (const line of lines) {
+                    if (line.trim().startsWith('data:')) {
+                        const dataStr = line.replace(/^data:\s*/, '').trim();
+                        if (!dataStr || dataStr === '[DONE]') continue;
+                        
+                        try {
+                            const parsed = JSON.parse(dataStr);
+                            const chunkText = parsed.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                            if (chunkText) {
+                                fullText += chunkText;
+                                // קוראים לפונקציית העדכון כדי להציג מיד את המילים החדשות על המסך
+                                if (onUpdate) onUpdate(fullText); 
+                            }
+                        } catch (e) {
+                            // מתעלמים משורות שאינן JSON (כמו רווחים שגוגל שולח לפעמים)
+                        }
+                    }
+                }
+            }
+            return fullText; // מחזירים את התשובה המלאה בסוף כדי לשמור בהיסטוריה
+        }
+
+        // מחליף את handleSend: משתמש בסטרים כדי לכתוב בזמן אמת
+        async function handleSend() {
+            const text = chatInput.value.trim();
+            if (!text) return;
+            
+            // נעילת הכפתור
+            document.getElementById('send-btn').disabled = true;
+            chatInput.disabled = true;
+
+            appendMessage('user', text);
+            chatInput.value = '';
+            chatHistory.push({ role: 'user', text: text });
+            loadingIndicator.classList.remove('hidden');
+
+            try {
+                // 1. יוצרים בועת הודעה ריקה למורה שבה נשפוך את הסטרים
+                const modelBubble = createMessageBubble('model');
+                
+                const contents = chatHistory.map(msg => ({
+                    role: msg.role === 'user' ? 'user' : 'model',
+                    parts: [{ text: msg.text }]
+                }));
+                const selectedTutorId = document.getElementById('tutor-select').value;
+                const currentSystemPrompt = prompts[selectedTutorId];
+
+                // 2. שולחים את הבקשה לסטרים עם callback שמעדכן את המסך
+                const fullResponseText = await fetchGeminiStream(contents, currentSystemPrompt, (currentText) => {
+                    loadingIndicator.classList.add('hidden'); // מעלימים את הלודר ברגע שהמילה הראשונה מגיעה!
+                    modelBubble.innerHTML = marked.parse(currentText);
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                });
+
+                // 3. שומרים בהיסטוריית השיחה רק כשהכל הסתיים לחלוטין
+                chatHistory.push({ role: 'model', text: fullResponseText });
+
+            } catch (error) {
+                console.error("Detailed Fetch Error:", error);
+                appendMessage('model', "⚠️ " + error.message);
+            } finally {
+                loadingIndicator.classList.add('hidden');
+                document.getElementById('send-btn').disabled = false;
+                chatInput.disabled = false;
+                chatInput.focus();
+            }
+        }
+		
+		// משתנה לשמירת הדו"ח השלם כדי שנוכל להעתיק אותו
+        let lastGeneratedSummary = "";
+
+        async function requestSummary() {
+            if (chatHistory.length < 2) {
+                alert("עוד לא התחלנו לעבוד! כתוב לי משהו כדי שנוכל לסכם.");
+                return;
+            }
+
+            // הפיכת היסטוריית השיחה לטקסט שג'מיני יכול לקרוא
+            const conversationLog = chatHistory.map(msg => 
+                `${msg.role === 'user' ? 'תלמיד' : 'מורה'}: ${msg.text}`
+            ).join('\n\n');
+
+			// הפרומפט של המעריך הפדגוגי - מותאם להערכת תהליך ודיאלוג
+            const evaluatorPrompt = `
+אתה כעת מעריך פדגוגי מומחה. לפניך תמליל שיחה בין תלמיד מחשבים (השם שלו: ${studentName}, כיתה: ${studentGrade}) לבין חונך וירטואלי סוקרטי.
+שים לב: המורה האנושית תבדוק את הקוד הסופי של התלמיד בעצמה באמצעות טסטים. המטרה שלך היא להעריך אך ורק את *תהליך הלמידה* ועד כמה הדיאלוג הסוקרטי קידם את התלמיד.
+התעלם משגיאות סינטקס או "התברברויות" בדרך. התמקד ביכולת של התלמיד לקחת רמז, לחשוב, ולהגיע לפריצת דרך.
+
+אנא פלוט את התשובה בפורמט הבא בדיוק:
+
+### משוב אישי ל-${studentName}
+(פנה לתלמיד בגוף שני. הייה חם, מעצים, ומעודד. תן לו משוב על *דרך החשיבה* שלו, על כך שלא ויתר, ועל האופן שבו השתמש בשאלות המנחות כדי להתקדם. שמור על פסקה קצרה).
+
+### 🔒 דוח למורה: הערכת תהליך הלמידה
+(סכם עבור המורה בגוף שלישי בצורה תמציתית ביותר, באמצעות טבלת Markdown בלבד. השתמש בנקודות היכן שצריך).
+
+| מדד תהליכי | הערכת המערכת (תמציתי וממוקד) |
+| :--- | :--- |
+| **איכות הדיאלוג הסוקרטי** | (האם התלמיד הבין את השאלות המנחות? האם הן עזרו לו לחלץ את עצמו מתקיעות?) |
+| **עצמאות בפתרון** | (עד כמה התלמיד לקח יוזמה מחשבתית, לעומת מקרים בהם "התחנן" לפתרון קסם מהמורה) |
+| **קפיצת המדרגה** | (מהי התובנה המרכזית שהתלמיד רכש במהלך השיחה שלא הייתה לו בתחילה?) |
+| **שלבי המבחן (אדפטיביות)** | (האם סיים את שאלת הבסיס? איך התמודד עם שאלות ההרחבה המותאמות אישית?) |
+            `;
+
+            const payload = {
+                contents: [{ role: 'user', parts: [{ text: `תמליל השיחה:\n${conversationLog}` }] }],
+                systemInstruction: { parts: [{ text: evaluatorPrompt }] }
+            };
+
+            loadingIndicator.classList.remove('hidden');
+            document.getElementById('summary-btn').disabled = true;
+
+            try {
+                // שימוש בפונקציית הסטרים החדשה שלנו (ללא הצגה חיה, פשוט ממתינים לתוצאה המלאה)
+                const summaryText = await fetchGeminiStream(contents, evaluatorPrompt, null);
+                
+                lastGeneratedSummary = summaryText; // שמירה בזיכרון להעתקה
+
+                // הזרקת התוכן לחלון הקופץ והצגתו
+                document.getElementById('summary-content').innerHTML = marked.parse(summaryText);
+                document.getElementById('summary-modal').classList.remove('hidden');
+
+            } catch (error) {
+                console.error("Summary Error:", error);
+                alert("אופס, לא הצלחנו להפיק סיכום כרגע. נסה שוב בעוד רגע.");
+            } finally {
+                loadingIndicator.classList.add('hidden');
+                document.getElementById('summary-btn').disabled = false;
+            }
+        }
+
+        // פונקציה להעתקת הדו"ח (כדי שהתלמיד ידביק בקלאסרום)
+        function copyReportForTeacher() {
+            if (!lastGeneratedSummary) return;
+            
+            // יצירת טקסט מסודר שכולל את שם התלמיד והכיתה
+            const textToCopy = `סיכום למידה חכמה - ${studentName} (כיתה ${studentGrade})\n\n${lastGeneratedSummary}`;
+            
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                alert("הדוח הועתק בהצלחה! 📋\nגש כעת למשימה ב-Google Classroom והדבק אותו בהערות למורה (Ctrl+V).");
+                document.getElementById('summary-modal').classList.add('hidden'); // סגירת החלון אחרי העתקה
+            }).catch(err => {
+                console.error('Failed to copy text: ', err);
+                alert("הייתה בעיה בהעתקה. נסה לסמן את הטקסט ולהעתיק ידנית.");
+            });
+        }
+
+// לוגיקת שינוי גודל הפאנלים (מותאם ל-RTL + צמצום והרחבה + מניעת חללים ריקים)
+        function initResize(resizer, targetPanel, adjacentPanel) {
+            let isCollapsed = false;
+            let previousTargetWidth = '';
+            let previousAdjacentWidth = '';
+
+            // 1. פיצ'ר לחיצה כפולה לצמצום/הרחבה
+            resizer.addEventListener('dblclick', () => {
+                if (!isCollapsed) {
+                    const parentWidth = targetPanel.parentElement.offsetWidth;
+                    const targetPercent = (targetPanel.offsetWidth / parentWidth) * 100;
+                    const adjacentPercent = (adjacentPanel.offsetWidth / parentWidth) * 100;
+
+                    previousTargetWidth = targetPanel.style.width || `${targetPercent}%`;
+                    previousAdjacentWidth = adjacentPanel.style.width || `${adjacentPercent}%`;
+
+                    targetPanel.style.width = '0px';
+                    targetPanel.style.overflow = 'hidden'; 
+                    targetPanel.style.padding = '0';
+                    targetPanel.style.border = 'none'; // למניעת קו שוליים שנתקע
+                    
+                    // מעבירים את כל הרוחב של הפאנל שצומצם אל הפאנל השכן!
+                    adjacentPanel.style.width = `${targetPercent + adjacentPercent}%`;
+                    adjacentPanel.style.flex = 'none';
+
+                    isCollapsed = true;
+                } else {
+                    targetPanel.style.width = previousTargetWidth;
+                    targetPanel.style.padding = ''; 
+                    targetPanel.style.border = '';
+                    adjacentPanel.style.width = previousAdjacentWidth;
+                    isCollapsed = false;
+                }
+            });
+
+            // 2. טיפול בגרירה ותיקון "בליעת" העכבר
+            resizer.addEventListener('mousedown', (e) => {
+                e.preventDefault(); 
+                const startX = e.clientX;
+                const startTargetWidth = targetPanel.offsetWidth;
+                const startAdjacentWidth = adjacentPanel.offsetWidth;
+                const totalWidthPx = startTargetWidth + startAdjacentWidth; // סך כל הרוחב של שני הפאנלים יחד
+                const parentWidth = targetPanel.parentElement.offsetWidth;
+
+                // הפתרון לבאג: כיבוי זמני של כל ה-iframes בזמן הגרירה
+                const iframes = document.querySelectorAll('iframe');
+                iframes.forEach(iframe => iframe.style.pointerEvents = 'none');
+
+                const onMouseMove = (e) => {
+                    const dx = e.clientX - startX; 
+                    
+                    // ב-RTL תזוזה ימינה (dx חיובי) מקטינה את הפאנל הימני ומגדילה את השמאלי
+                    let newTargetWidthPx = startTargetWidth - dx;
+                    let newAdjacentWidthPx = startAdjacentWidth + dx;
+
+                    // הגדרת גבולות (מינימום 10% כדי שפאנל לא יעלם לגמרי בטעות)
+                    const minPx = parentWidth * 0.1;
+                    const maxPx = totalWidthPx - minPx;
+
+                    if (newTargetWidthPx < minPx) {
+                        newTargetWidthPx = minPx;
+                        newAdjacentWidthPx = maxPx;
+                    } else if (newTargetWidthPx > maxPx) {
+                        newTargetWidthPx = maxPx;
+                        newAdjacentWidthPx = minPx;
+                    }
+
+                    // העברת הרוחב לאחוזים (כדי שאם התלמיד יגדיל את חלון הדפדפן, הפרופורציות יישמרו)
+                    const targetPercent = (newTargetWidthPx / parentWidth) * 100;
+                    const adjacentPercent = (newAdjacentWidthPx / parentWidth) * 100;
+
+                    targetPanel.style.width = `${targetPercent}%`;
+                    adjacentPanel.style.width = `${adjacentPercent}%`;
+                    
+                    targetPanel.style.flex = 'none'; 
+                    adjacentPanel.style.flex = 'none'; 
+
+                    // אם המשתמש התחיל לגרור ידנית כשהחלון היה מצומצם, נבטל את מצב הצמצום
+                    if (isCollapsed) {
+                        targetPanel.style.overflow = '';
+                        targetPanel.style.padding = '';
+                        targetPanel.style.border = '';
+                        isCollapsed = false;
+                    }
+                };
+
+                const onMouseUp = () => {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                    document.body.style.cursor = 'default';
+                    
+                    iframes.forEach(iframe => iframe.style.pointerEvents = 'auto');
+                };
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+                document.body.style.cursor = 'col-resize';
+            });
+        }
+
+        // הפעלת הפונקציה על שני הפסים המפרידים
+        initResize(document.getElementById('resizer1'), document.getElementById('panel1'), document.getElementById('panel2'));
+        initResize(document.getElementById('resizer2'), document.getElementById('panel2'), document.getElementById('panel3'));
+    </script>
+	
+	<div id="summary-modal" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center backdrop-blur-sm hidden">
+        <div class="bg-white p-6 rounded-2xl shadow-2xl w-[600px] max-w-[90%] max-h-[90vh] flex flex-col">
+            <h2 class="text-2xl font-bold mb-4 text-emerald-700 flex items-center gap-2">
+                <span>🎓</span> סיכום למידה ומשוב
+            </h2>
+            
+            <div id="summary-content" class="flex-1 overflow-y-auto mb-4 text-gray-700 space-y-4 markdown-body p-2">
+                </div>
+
+            <div class="border-t pt-4 flex justify-between items-center gap-4 mt-auto">
+                <button onclick="document.getElementById('summary-modal').classList.add('hidden')" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors font-medium">
+                    סגור
+                </button>
+                <button onclick="copyReportForTeacher()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-colors flex items-center gap-2">
+                    <span>📋</span> העתק דוח למורה (להגשה)
+                </button>
+            </div>
+        </div>
+    </div>
+	
+</body>
+</html>
+```
