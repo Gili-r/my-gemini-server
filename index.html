@@ -591,17 +591,15 @@
 | **שלבי המבחן (אדפטיביות)** | (האם סיים את שאלת הבסיס? איך התמודד עם שאלות ההרחבה המותאמות אישית?) |
             `;
 
-            const payload = {
-                contents: [{ role: 'user', parts: [{ text: `תמליל השיחה:\n${conversationLog}` }] }],
-                systemInstruction: { parts: [{ text: evaluatorPrompt }] }
-            };
+            // מכינים רק את מערך ההודעות, הפונקציה כבר תארוז את זה ל-payload
+            const summaryContents = [{ role: 'user', parts: [{ text: `תמליל השיחה:\n${conversationLog}` }] }];
 
             loadingIndicator.classList.remove('hidden');
             document.getElementById('summary-btn').disabled = true;
 
             try {
-                // שימוש בפונקציית הסטרים החדשה שלנו (ללא הצגה חיה, פשוט ממתינים לתוצאה המלאה)
-                const summaryText = await fetchGeminiStream(contents, evaluatorPrompt, null);
+                // שולחים את מערך ההודעות והפרומפט בנפרד
+                const summaryText = await fetchGeminiStream(summaryContents, evaluatorPrompt, null);
                 
                 lastGeneratedSummary = summaryText; // שמירה בזיכרון להעתקה
 
