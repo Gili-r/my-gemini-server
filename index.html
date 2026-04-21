@@ -638,10 +638,17 @@
 
 	
     		// הכנת היסטוריית השיחה כתוכן לסיכום
-    		const contentsForSummary = [
-        		...chatHistory,
-        		{ role: 'user', text: summaryPrompt }
-    		];
+// תרגום היסטוריית השיחה למבנה המדויק שג'מיני דורש (עם parts)
+			const contentsForSummary = [
+				...chatHistory.map(msg => ({
+					role: msg.role === 'user' ? 'user' : 'model',
+					parts: [{ text: msg.text }]
+				})),
+				{ 
+					role: 'user', 
+					parts: [{ text: summaryPrompt }] 
+				}
+			];
 
     		let attempt = 0;
     		const maxRetries = 3;
