@@ -459,7 +459,7 @@
         async function fetchGeminiStream(contents, systemInstructionText, onUpdate) {
             const payload = {
                 contents: contents,
-                systemInstruction: { parts: [{ text: systemInstructionText }] }
+                system_instruction: { parts: [{ text: systemInstructionText }] }
             };
 
             const response = await fetch(PROXY_URL, {
