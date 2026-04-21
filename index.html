@@ -424,13 +424,6 @@
             const url = document.getElementById('drive-url').value.trim();
             if (!url) return;
             const iframe = document.getElementById('drive-iframe');
-	    	const newSrc = url.replace(/\/view.*$/, '/preview').replace(/\/edit.*$/, '/preview');
-    
-    		// מניעת טעינה כפולה וכבדה
-    		if (iframe.src === newSrc && !iframe.classList.contains('hidden')) {
-        		return; 
-    		}
-			
             iframe.src = url.replace(/\/view.*$/, '/preview').replace(/\/edit.*$/, '/preview');
             iframe.classList.remove('hidden');
             document.getElementById('drive-placeholder').classList.add('hidden');
@@ -539,49 +532,27 @@
             try {
                 // 1. יוצרים בועת הודעה ריקה למורה שבה נשפוך את הסטרים
                 const modelBubble = createMessageBubble('model');
-
-				const contents = chatHistory.map(msg => ({
+                
+                const contents = chatHistory.map(msg => ({
                     role: msg.role === 'user' ? 'user' : 'model',
                     parts: [{ text: msg.text }]
                 }));
                 const selectedTutorId = document.getElementById('tutor-select').value;
                 const currentSystemPrompt = prompts[selectedTutorId];
-				
-				let attempt = 0;
-				const maxRetries = 3;
-				let success = false;
-				while (attempt < maxRetries && !success) {
-    				try {
-        				const fullResponseText = await fetchGeminiStream(contents, currentSystemPrompt, (currentText) => {
-            				loadingIndicator.classList.add('hidden'); 
-            				modelBubble.innerHTML = marked.parse(currentText);
-            				chatContainer.scrollTop = chatContainer.scrollHeight;
-        				});
-        
-        				chatHistory.push({ role: 'model', text: fullResponseText });
-        				success = true; // הצלחנו, אפשר לצאת מהלולאה
-        
-    				} catch (error) {
-        				attempt++;
-        				console.warn(`Attempt ${attempt} failed:`, error.message);
-        
-        				if (attempt >= maxRetries) {
-            				// רק אחרי 3 ניסיונות שנכשלו נרים ידיים ונציג שגיאה לתלמיד
-            				modelBubble.innerHTML = "⚠️ המערכת כרגע בעומס פניות של כיתה שלמה. אנא המתן חצי דקה ונסה לשלוח שוב את ההודעה.";
-            				throw error;
-        				} else {
-            				// נותנים חיווי לתלמיד שאנחנו מנסים שוב
-            				modelBubble.innerHTML = `<span class="text-xs text-gray-400">עומס קל, מנסה שוב (ניסיון ${attempt}/${maxRetries})...</span>`;
-            
-            				// Jitter: השהיה אקראית של 2 עד 5 שניות כדי לפזר את העומס של כל הכיתה
-            				const jitter = Math.floor(Math.random() * 3000) + 2000;
-            				await new Promise(r => setTimeout(r, jitter));
-        				}
-    				}
-				}
 
-            } catch (finalError) {
-				console.error("All attempts failed", finalError);
+                // 2. שולחים את הבקשה לסטרים עם callback שמעדכן את המסך
+                const fullResponseText = await fetchGeminiStream(contents, currentSystemPrompt, (currentText) => {
+                    loadingIndicator.classList.add('hidden'); // מעלימים את הלודר ברגע שהמילה הראשונה מגיעה!
+                    modelBubble.innerHTML = marked.parse(currentText);
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                });
+
+                // 3. שומרים בהיסטוריית השיחה רק כשהכל הסתיים לחלוטין
+                chatHistory.push({ role: 'model', text: fullResponseText });
+
+            } catch (error) {
+                console.error("Detailed Fetch Error:", error);
+                appendMessage('model', "⚠️ " + error.message);
             } finally {
                 loadingIndicator.classList.add('hidden');
                 document.getElementById('send-btn').disabled = false;
@@ -593,29 +564,19 @@
 		// משתנה לשמירת הדו"ח השלם כדי שנוכל להעתיק אותו
         let lastGeneratedSummary = "";
 
-		async function requestSummary() {
-			if (chatHistory.length < 2) {
-    			alert("עוד לא התחלנו לעבוד! כתוב לי משהו כדי שנוכל לסכם.");
-        		return;
-    		}
+        async function requestSummary() {
+            if (chatHistory.length < 2) {
+                alert("עוד לא התחלנו לעבוד! כתוב לי משהו כדי שנוכל לסכם.");
+                return;
+            }
 
-    		const summaryModal = document.getElementById('summary-modal');
-    		const summaryContent = document.getElementById('summary-content');
-    		const summaryBtn = document.querySelector('button[onclick="requestSummary()"]');
-
-    		// 1. הכנות למצב טעינה
-    		summaryModal.classList.remove('hidden');
-    		summaryContent.innerHTML = `
-        		<div class="flex items-center justify-center p-8">
-            		<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-700"></div>
-            		<span class="mr-3">מכין את סיכום הלמידה שלך...</span>
-        		</div>`;
-    
-    		// מניעת לחיצות כפולות
-    		if (summaryBtn) summaryBtn.disabled = true;
+            // הפיכת היסטוריית השיחה לטקסט שג'מיני יכול לקרוא
+            const conversationLog = chatHistory.map(msg => 
+                `${msg.role === 'user' ? 'תלמיד' : 'מורה'}: ${msg.text}`
+            ).join('\n\n');
 
 			// הפרומפט של המעריך הפדגוגי - מותאם להערכת תהליך ודיאלוג
-            const summaryPrompt = `
+            const evaluatorPrompt = `
 אתה כעת מעריך פדגוגי מומחה. לפניך תמליל שיחה בין תלמיד מחשבים (השם שלו: ${studentName}, כיתה: ${studentGrade}) לבין חונך וירטואלי סוקרטי.
 שים לב: המורה האנושית תבדוק את הקוד הסופי של התלמיד בעצמה באמצעות טסטים. המטרה שלך היא להעריך אך ורק את *תהליך הלמידה* ועד כמה הדיאלוג הסוקרטי קידם את התלמיד.
 התעלם משגיאות סינטקס או "התברברויות" בדרך. התמקד ביכולת של התלמיד לקחת רמז, לחשוב, ולהגיע לפריצת דרך.
@@ -636,69 +597,30 @@
 | **שלבי המבחן (אדפטיביות)** | (האם סיים את שאלת הבסיס? איך התמודד עם שאלות ההרחבה המותאמות אישית?) |
             `;
 
-	
-    		// הכנת היסטוריית השיחה כתוכן לסיכום
-    		const contentsForSummary = [
-        		...chatHistory,
-        		{ role: 'user', text: summaryPrompt }
-    		];
+            // מכינים רק את מערך ההודעות, הפונקציה כבר תארוז את זה ל-payload
+            const summaryContents = [{ role: 'user', parts: [{ text: `תמליל השיחה:\n${conversationLog}` }] }];
 
-    		let attempt = 0;
-    		const maxRetries = 3;
-    		let success = false;
+            loadingIndicator.classList.remove('hidden');
+            document.getElementById('summary-btn').disabled = true;
 
-    		try {
-				// לולאת ה-Retry למניעת קריסה בעומס כיתתי
-    			while (attempt < maxRetries && !success) {
-        			try {
-            			let fullText = "";
-            
-            			// שימוש ב-fetchGeminiStream הקיים שלך
-            			await fetchGeminiStream(contentsForSummary, summaryPrompt, (chunk) => {
-                			fullText += chunk;
-                			summaryContent.innerHTML = marked.parse(fullText);
-            			});
-
-            			success = true; // הצלחנו!
-						lastGeneratedSummary = fullText; // שמירת הטקסט הסופי להעתקה
-        			} catch (error) {
-            			attempt++;
-            			console.error(`Summary attempt ${attempt} failed:`, error);
-
-            			if (attempt < maxRetries) {
-                			summaryContent.innerHTML = `
-                    			<div class="text-center p-4">
-                        			<p class="text-amber-600 font-bold">השרת עמוס מעט (ניסיון ${attempt}/${maxRetries})...</p>
-                        			<p class="text-sm text-gray-500">מנסה שוב באופן אוטומטי תוך מספר שניות.</p>
-                        			<div class="mt-2 animate-pulse text-2xl">⏳</div>
-                    			</div>`;
+            try {
+                // שולחים את מערך ההודעות והפרומפט בנפרד
+                const summaryText = await fetchGeminiStream(summaryContents, evaluatorPrompt, null);
                 
-                			// Jitter: המתנה אקראית של 3-6 שניות כדי לא לתקוף את השרת שוב באותה שנייה
-                			const waitTime = Math.floor(Math.random() * 3000) + 3000;
-                			await new Promise(r => setTimeout(r, waitTime));
-            			} else {
-                			// כישלון סופי אחרי כל הניסיונות
-                			summaryContent.innerHTML = `
-                    			<div class="bg-red-50 border border-red-200 p-4 rounded-lg text-red-700">
-                        			<p class="font-bold">אופס! לא הצלחנו לייצר סיכום כרגע.</p>
-                        			<p class="text-sm">יכול להיות שיש עומס חריג על המערכת. נסה ללחוץ שוב על כפתור הסיכום בעוד דקה.</p>
-                        			<button onclick="requestSummary()" class="mt-3 bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors">
-                            			נסה שוב עכשיו
-                        			</button>
-                    			</div>`;
-            			}
-        			}
-    			}
-			} catch (error) {
-        		// 2. טיפול בשגיאה סופית (רק אם כל הניסיונות נכשלו)
-        		console.error("Summary Error:", error);
-        		alert("אופס, לא הצלחנו להפיק סיכום כרגע. נסה שוב בעוד רגע.");
-    		} finally {
-        		// 3. ניקוי סופי - תמיד קורה, בין אם הצלחנו ובין אם נכשלנו
-        		if (loadingIndicator) loadingIndicator.classList.add('hidden');
-        		if (summaryBtn) summaryBtn.disabled = false;
-    		}
-		}
+                lastGeneratedSummary = summaryText; // שמירה בזיכרון להעתקה
+
+                // הזרקת התוכן לחלון הקופץ והצגתו
+                document.getElementById('summary-content').innerHTML = marked.parse(summaryText);
+                document.getElementById('summary-modal').classList.remove('hidden');
+
+            } catch (error) {
+                console.error("Summary Error:", error);
+                alert("אופס, לא הצלחנו להפיק סיכום כרגע. נסה שוב בעוד רגע.");
+            } finally {
+                loadingIndicator.classList.add('hidden');
+                document.getElementById('summary-btn').disabled = false;
+            }
+        }
 
         // פונקציה להעתקת הדו"ח (כדי שהתלמיד ידביק בקלאסרום)
         function copyReportForTeacher() {
