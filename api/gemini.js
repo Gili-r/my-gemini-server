@@ -1,15 +1,27 @@
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-module.exports = async function handler(req, res) {
-    // 1. הגדרות CORS
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-    if (req.method === 'OPTIONS') return res.status(200).end();
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
+export const config = {
+    runtime: 'edge', // זה הפתרון האמיתי לקיטועים ב-Vercel!
+};
+
+export default async function handler(req) {
+    // 1. הגדרות CORS כולל ביטול הבאפרינג
+    const headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no' // אומר ל-Vercel לא לעכב את הטקסט בבופר
+    };
+
+    if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers });
+    if (req.method !== 'POST') return new Response(JSON.stringify({ error: 'Method Not Allowed' }), { status: 405, headers });
 
     const apiKey = (process.env.GEMINI_API_KEY || '').trim();
-    if (!apiKey) return res.status(500).json({ error: 'מפתח API חסר בהגדרות השרת' });
+    // תיקון 1: הוספנו return
+    if (!apiKey) return new Response(JSON.stringify({ error: 'מפתח API חסר בהגדרות השרת' }), { status: 500, headers });
 
 	const configurations = [
     	{ name: "gemini-2.5-flash", version: "v1beta" }, 
@@ -18,52 +30,43 @@ module.exports = async function handler(req, res) {
 	];
 
     let lastError = null;
+	let body;
+	try {
+        body = await req.json();
+    } catch (error) {
+        console.error("Failed to parse request body:", error);
+        return new Response(JSON.stringify({ error: 'המידע שנשלח אינו תקין (Invalid JSON)' }), { 
+            status: 400, 
+            headers: headers 
+        });
+    }
 
     try {
         // 3. לולאת ניסיונות
         for (const config of configurations) {
             try {
-                // שינוי 1: הפנייה לנתיב של streamGenerateContent עם alt=sse
                 const url = `https://generativelanguage.googleapis.com/${config.version}/models/${config.name}:streamGenerateContent?key=${apiKey}&alt=sse`;
                 
                 const response = await fetch(url, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(req.body)
+                    // שימי לב שכאן אנחנו צריכים להגדיר שוב Content-Type עבור הבקשה לגוגל, וזה בסדר
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify(body)
                 });
 
-                // אם הבקשה נכשלה (למשל 429 או 503), נשמור שגיאה ונמשיך למודל הבא
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({}));
                     lastError = errorData.error || { message: `Status ${response.status}` };
                     console.warn(`Model ${config.name} failed, trying next... Reason:`, lastError.message);
-					// תיקון קריטי: המתנה לפני תקיפת המודל הבא! (Exponential Backoff קטן)
     				await sleep(2000);
                     continue; 
                 }
 
-                // שינוי 2: מגדירים ל-Vercel לשדר נתונים בזרם (Streaming) ללקוח
-                res.setHeader('Content-Type', 'text/event-stream');
-                res.setHeader('Cache-Control', 'no-cache');
-                res.setHeader('Connection', 'keep-alive');
-				res.flushHeaders(); // <--- זו שורת הקסם החדשה! היא מכריחה את Vercel להתחיל להזרים מיד!
                 console.log(`Streaming success with: ${config.name}`);
 
-                // שינוי 3: קוראים את הזרם שמגיע מגוגל וכותבים אותו מיד החוצה ללקוח
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder('utf-8');
-
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break; // אם סיימנו, יוצאים מהלולאה
-                    
-                    // מפענחים את החתיכה (chunk) וכותבים אותה ב-Response
-                    const chunk = decoder.decode(value, { stream: true });
-                    res.write(chunk); 
-                }
-
-                res.end(); // מסיימים את החיבור באופן רשמי
-                return;    // יוצאים לחלוטין מהפונקציה, הכל עבד!
+				// תיקון 2: מחקנו את ה-headers הכפול, משתמשים בזה שהוגדר למעלה!
+				// מחזירים את הזרם ישירות ללקוח - השרת עושה את הכל מאחורי הקלעים!
+				return new Response(response.body, { headers });				
 
             } catch (err) {
                 console.error(`Network error with ${config.name}:`, err);
@@ -71,13 +74,14 @@ module.exports = async function handler(req, res) {
             }
         }
 
-        // 4. אם הגענו לכאן, כל המודלים נכשלו (מחזירים שגיאת JSON רגילה)
-        return res.status(503).json({
+        // תיקון 3: המרת פקודות ה-res הישנות ל-Edge Response
+        return new Response(JSON.stringify({
             error: "כל המודלים עמוסים כרגע",
             details: lastError
-        });
+        }), { status: 503, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
 
     } catch (criticalError) {
-        return res.status(500).json({ error: 'שגיאה קריטית בשרת' });
+        // תיקון 4: המרה כנ"ל לשגיאת 500
+        return new Response(JSON.stringify({ error: 'שגיאה קריטית בשרת' }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
     }
 }
