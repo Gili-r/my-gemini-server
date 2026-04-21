@@ -1,3 +1,4 @@
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 module.exports = async function handler(req, res) {
     // 1. הגדרות CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -36,6 +37,8 @@ module.exports = async function handler(req, res) {
                     const errorData = await response.json().catch(() => ({}));
                     lastError = errorData.error || { message: `Status ${response.status}` };
                     console.warn(`Model ${config.name} failed, trying next... Reason:`, lastError.message);
+					// תיקון קריטי: המתנה לפני תקיפת המודל הבא! (Exponential Backoff קטן)
+    				await sleep(2000);
                     continue; 
                 }
 
