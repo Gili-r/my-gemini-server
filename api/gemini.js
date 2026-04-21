@@ -11,9 +11,9 @@ module.exports = async function handler(req, res) {
     if (!apiKey) return res.status(500).json({ error: 'מפתח API חסר בהגדרות השרת' });
 
 	const configurations = [
-    	{ name: "gemini-2.0-flash", version: "v1beta" }, // חייב v1beta עבור המודלים החדשים
     	{ name: "gemini-2.5-flash", version: "v1beta" }, 
-    	{ name: "gemini-1.5-flash", version: "v1" }      // יכול לעבוד בשניהם, v1 יציב יותר
+    	{ name: "gemini-2.5-flash-lite", version: "v1beta" }, 
+    	{ name: "gemini-1.5-flash-latest", version: "v1beta" }     
 	];
 
     let lastError = null;
