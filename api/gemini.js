@@ -14,7 +14,7 @@ module.exports = async function handler(req, res) {
 	// רשימת מודלים חסכונית ויציבה (Flash בלבד)
     const configurations = [
         // עדיפות 1: המודל המאוזן והמהיר ביותר
-        { name: "gemini-2.0-flash", version: "v1beta" }, 
+        { name: "gemini-2.0-flash", version: "v1" }, 
         
         // עדיפות 2: מודל חדיש כגיבוי
         { name: "gemini-2.5-flash", version: "v1beta" }, 
