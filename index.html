@@ -637,18 +637,31 @@
             `;
 
 	
-    		// הכנת היסטוריית השיחה כתוכן לסיכום
-// תרגום היסטוריית השיחה למבנה המדויק שג'מיני דורש (עם parts)
-			const contentsForSummary = [
-				...chatHistory.map(msg => ({
-					role: msg.role === 'user' ? 'user' : 'model',
-					parts: [{ text: msg.text }]
-				})),
-				{ 
-					role: 'user', 
-					parts: [{ text: summaryPrompt }] 
-				}
-			];
+			// בניית הפרומפט שכולל גם את ההוראות (summaryPrompt) וגם את ההיסטוריה
+			const fullPromptWithHistory = `${summaryPrompt}
+    
+				להלן היסטוריית השיחה המלאה לצורך ניתוח:
+				${JSON.stringify(chatHistory)}`;
+
+            // 1. הגדרת המשתנה שהיה חסר (במבנה שג'מיני מצפה לו)
+            const contentsForSummary = [{
+				role: 'user',
+                parts: [{ text: fullPromptWithHistory }]
+        	}];
+			
+			
+			try {
+
+            
+            			// 2. קריאה לפונקציית הסטרים (בלי fullText += !!!)
+            			await fetchGeminiStream(contentsForSummary, summaryPrompt, (currentText) => {
+                			// currentText מכיל כבר את כל הטקסט הנקי שנצבר, פשוט מציגים אותו!
+                			summaryContent.innerHTML = marked.parse(currentText);
+                			lastGeneratedSummary = currentText; // עדכון הדו"ח הסופי להעתקה
+            			});
+
+            			success = true; // הצלחנו!
+        			} catch (error) {
 
     		let attempt = 0;
     		const maxRetries = 3;
@@ -658,16 +671,16 @@
 				// לולאת ה-Retry למניעת קריסה בעומס כיתתי
     			while (attempt < maxRetries && !success) {
         			try {
-            			let fullText = "";
-            
-            			// שימוש ב-fetchGeminiStream הקיים שלך
-            			await fetchGeminiStream(contentsForSummary, summaryPrompt, (chunk) => {
-                			fullText += chunk;
-                			summaryContent.innerHTML = marked.parse(fullText);
+					
+            			// 2. קריאה לפונקציית הסטרים (בלי fullText += !!!)
+            			await fetchGeminiStream(contentsForSummary, summaryPrompt, (currentText) => {
+                			// currentText מכיל כבר את כל הטקסט הנקי שנצבר, פשוט מציגים אותו!
+                			summaryContent.innerHTML = marked.parse(currentText);
+                			lastGeneratedSummary = currentText; // עדכון הדו"ח הסופי להעתקה
             			});
 
             			success = true; // הצלחנו!
-						lastGeneratedSummary = fullText; // שמירת הטקסט הסופי להעתקה
+
         			} catch (error) {
             			attempt++;
             			console.error(`Summary attempt ${attempt} failed:`, error);
