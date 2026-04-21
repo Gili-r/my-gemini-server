@@ -14,7 +14,7 @@ module.exports = async function handler(req, res) {
 	const configurations = [
     	{ name: "gemini-2.5-flash", version: "v1beta" }, 
     	{ name: "gemini-2.5-flash-lite", version: "v1beta" }, 
-    	{ name: "gemini-1.5-flash-latest", version: "v1beta" }     
+    	{ name: "gemini-1.5-flash", version: "v1" }     
 	];
 
     let lastError = null;
