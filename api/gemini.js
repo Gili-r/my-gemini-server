@@ -46,6 +46,7 @@ module.exports = async function handler(req, res) {
                 res.setHeader('Content-Type', 'text/event-stream');
                 res.setHeader('Cache-Control', 'no-cache');
                 res.setHeader('Connection', 'keep-alive');
+				res.flushHeaders(); // <--- זו שורת הקסם החדשה! היא מכריחה את Vercel להתחיל להזרים מיד!
                 console.log(`Streaming success with: ${config.name}`);
 
                 // שינוי 3: קוראים את הזרם שמגיע מגוגל וכותבים אותו מיד החוצה ללקוח
