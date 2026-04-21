@@ -10,18 +10,11 @@ module.exports = async function handler(req, res) {
     const apiKey = (process.env.GEMINI_API_KEY || '').trim();
     if (!apiKey) return res.status(500).json({ error: 'מפתח API חסר בהגדרות השרת' });
 
-    // 2. רשימת המודלים
-	// רשימת מודלים חסכונית ויציבה (Flash בלבד)
-    const configurations = [
-        // עדיפות 1: המודל המאוזן והמהיר ביותר
-        { name: "gemini-2.0-flash", version: "v1" }, 
-        
-        // עדיפות 2: מודל חדיש כגיבוי
-        { name: "gemini-2.5-flash", version: "v1beta" }, 
-        
-        // עדיפות 3: גרסת ה-Lite (חסכונית במיוחד) כרשת ביטחון אחרונה
-        { name: "gemini-2.5-flash-lite", version: "v1beta" }
-    ];
+	const configurations = [
+    	{ name: "gemini-2.0-flash", version: "v1beta" }, // חייב v1beta עבור המודלים החדשים
+    	{ name: "gemini-2.5-flash", version: "v1beta" }, 
+    	{ name: "gemini-1.5-flash", version: "v1" }      // יכול לעבוד בשניהם, v1 יציב יותר
+	];
 
     let lastError = null;
 
