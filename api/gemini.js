@@ -19,7 +19,6 @@ export default async function handler(req) {
     if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers });
     if (req.method !== 'POST') return new Response(JSON.stringify({ error: 'Method Not Allowed' }), { status: 405, headers });
 
-    const apiKey = (process.env.GEMINI_API_KEY || '').trim();
 	const userProvidedKey = req.headers.get('x-api-key'); // שליפת המפתח מה-Header
 	const apiKey = (userProvidedKey || process.env.GEMINI_API_KEY || '').trim();
 
