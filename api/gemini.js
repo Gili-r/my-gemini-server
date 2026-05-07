@@ -9,7 +9,7 @@ export default async function handler(req) {
     const headers = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Headers': 'Content-Type, x-api-key',
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
@@ -20,8 +20,11 @@ export default async function handler(req) {
     if (req.method !== 'POST') return new Response(JSON.stringify({ error: 'Method Not Allowed' }), { status: 405, headers });
 
     const apiKey = (process.env.GEMINI_API_KEY || '').trim();
-    // תיקון 1: הוספנו return
-    if (!apiKey) return new Response(JSON.stringify({ error: 'מפתח API חסר בהגדרות השרת' }), { status: 500, headers });
+	const userProvidedKey = req.headers.get('x-api-key'); // שליפת המפתח מה-Header
+	const apiKey = (userProvidedKey || process.env.GEMINI_API_KEY || '').trim();
+
+	// אם אין מפתח בכלל (לא מהמשתמש ולא מהשרת), נחזיר שגיאה
+	if (!apiKey) return new Response(JSON.stringify({ error: 'מפתח API חסר. אנא הגדר מפתח בהגדרות או ספק מפתח אישי.' }), { status: 500, headers });
 
 	const configurations = [
     	{ name: "gemini-2.5-flash", version: "v1beta" }, 
