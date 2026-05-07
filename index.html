@@ -259,7 +259,7 @@
 
     <script>
         const PROXY_URL = '/api/gemini';
-		const PRO_URL = 'code-mentor-pro.vercel.app'; // הכתובת של המשתמשים עם מפתח אישי
+		const PRO_URL = 'pro.your-app.com'; // הכתובת של המשתמשים עם מפתח אישי
 
 		// ==========================================
         // מאגר הפרומפטים למורים השונים
@@ -553,10 +553,16 @@
                 contents: contents,
                 system_instruction: { parts: [{ text: systemInstructionText }] }
             };
+			
+			// שליפת המפתח מהדפדפן (אם קיים)
+			const savedKey = localStorage.getItem('gemini_api_key') || '';
 
             const response = await fetch(PROXY_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+					'Content-Type': 'application/json',
+					'x-api-key': savedKey // הוספת ה-Header שחסר
+				},
                 body: JSON.stringify(payload)
             });
 
